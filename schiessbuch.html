@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F4535">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Schießbuch">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Schießbuch Pistole</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="supabase.js"></script>
+<script src="config.js"></script>
+<script src="supa-db.js"></script>
+<style>
+:root{
+  --paper:#F7F8F6; --card:#FFFFFF; --ink:#18221D; --muted:#5E6B64; --line:#D9DED9;
+  --green:#1F4535; --green-soft:#E6EEE9; --brass:#A8761F; --rwk:#7A2E1F; --danger:#9B2C1C;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111814; --card:#18211C; --ink:#E8EDE9; --muted:#9AA79F; --line:#2C3832;
+    --green:#8CC4A6; --green-soft:#1F2D26; --brass:#D9A546; --rwk:#E08A73; --danger:#E5826F;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111814; --card:#18211C; --ink:#E8EDE9; --muted:#9AA79F; --line:#2C3832;
+  --green:#8CC4A6; --green-soft:#1F2D26; --brass:#D9A546; --rwk:#E08A73; --danger:#E5826F;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 15px/1.5 Barlow,"Segoe UI",Arial,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 18px 96px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:3px solid var(--green);padding-bottom:14px}
+h1{font:700 44px/1 "Barlow Condensed","Arial Narrow",sans-serif;margin:0;letter-spacing:-.5px;color:var(--green)}
+h2{font:700 22px/1.1 "Barlow Condensed",Arial,sans-serif;margin:0 0 10px;color:var(--green)}
+.sub{color:var(--muted);margin-top:6px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:600 15px Barlow,Arial,sans-serif;background:var(--green);color:var(--paper);border:1px solid var(--green);border-radius:6px;padding:10px 18px;cursor:pointer;min-height:44px}
+.btn.ghost{background:transparent;color:var(--green)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger)}
+.btn:focus-visible,.tab:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,.card:focus-visible,tr.click:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+.btn[hidden]{display:none}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{font:600 15px Barlow,Arial,sans-serif;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:6px 14px;cursor:pointer;min-height:36px}
+.tab[aria-pressed="true"]{background:var(--green);color:var(--paper);border-color:var(--green)}
+.tab small{font-weight:400;opacity:.8}
+.filters{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:22px 0 18px}
+.year{color:var(--muted);font-weight:500}
+.year select{font:600 15px Barlow,Arial,sans-serif;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin-left:6px}
+.art{font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--green-soft);color:var(--green);white-space:nowrap}
+.art.rwk{background:transparent;border:1px solid var(--rwk);color:var(--rwk)}
+.art.wk{background:transparent;border:1px solid var(--brass);color:var(--brass)}
+.small{display:block;color:var(--muted);font-size:12px;font-weight:400;font-family:Barlow,Arial,sans-serif;margin-top:3px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:22px}
+.stat{background:var(--card);padding:14px 16px}
+.stat b{display:block;font:600 30px/1.1 "Barlow Condensed",Arial,sans-serif;color:var(--ink)}
+.stat span{color:var(--muted);font-size:13px}
+.stat.best b{color:var(--brass)}
+
+/* Leistungskurve */
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:22px}
+.chart{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px 10px}
+.chart.wide{grid-column:1/-1}
+.chart h3{font:700 18px/1.1 "Barlow Condensed",Arial,sans-serif;margin:0;color:var(--ink)}
+.chart .meta{color:var(--muted);font-size:13px;margin:2px 0 6px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .axis{fill:var(--muted);font:12px Barlow,Arial,sans-serif}
+.chart .trend{fill:none;stroke:var(--green);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.chart .dot-t{fill:var(--green);opacity:.45}
+.chart .dot-w{fill:var(--brass)}
+.chart .dot-best{fill:none;stroke:var(--brass);stroke-width:2}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.legend i.t{background:var(--green);opacity:.45}.legend i.w{background:var(--brass)}
+.legend i.l{width:16px;height:3px;border-radius:2px;background:var(--green);vertical-align:3px}
+.chart .none{color:var(--muted);font-size:14px;padding:18px 0}
+
+/* Tabelle (Desktop) */
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th{font:600 13px Barlow,Arial,sans-serif;text-align:left;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--green-soft)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.total{font:700 20px/1 "Barlow Condensed",Arial,sans-serif}
+td.lfd{color:var(--muted);font-variant-numeric:tabular-nums}
+tr.yr td{background:var(--green-soft);font:700 18px "Barlow Condensed",Arial,sans-serif;color:var(--green);padding:8px 12px}
+tr.yr td span{font:400 13px Barlow,Arial,sans-serif;color:var(--muted);margin-left:8px}
+.note{color:var(--muted);font-size:14px;max-width:260px}
+.disz{font-weight:600}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.msg{color:var(--muted);font-size:13px;margin-top:10px;min-height:1em}
+
+/* Kartenliste (Handy) */
+.cards{display:none}
+.yrhead{font:700 20px "Barlow Condensed",Arial,sans-serif;color:var(--green);margin:18px 0 8px;display:flex;align-items:baseline;gap:8px}
+.yrhead span{font:400 13px Barlow,Arial,sans-serif;color:var(--muted)}
+.card{display:grid;grid-template-columns:1fr auto;gap:2px 12px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:8px;width:100%;text-align:left;font:inherit;color:inherit}
+button.card{cursor:pointer}
+.card .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card .date{font-weight:600}
+.card .res{grid-row:1/span 3;grid-column:2;align-self:center;text-align:right;font:700 28px/1 "Barlow Condensed",Arial,sans-serif}
+.card .res small{display:block;font:400 12px Barlow,Arial,sans-serif;color:var(--muted);margin-top:2px}
+.card .top,.card .line2,.card .line3{grid-column:1}
+.card .line2{color:var(--ink);font-size:14px}
+.card .line3{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:5;border-radius:999px;padding:14px 22px;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:16px;display:none}
+
+/* Eingabe-Dialog */
+dialog{border:0;border-radius:12px;padding:0;background:var(--card);color:var(--ink);width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 24px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog form{display:flex;flex-direction:column;max-height:calc(100dvh - 24px)}
+.dlg-head{padding:18px 20px 8px;border-bottom:1px solid var(--line)}
+.dlg-body{padding:14px 20px;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.dlg-foot{padding:12px 20px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.dlg-foot .right{display:flex;gap:8px;margin-left:auto}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field.full{grid-column:1/-1}
+.field label{font-weight:600;font-size:13px;color:var(--muted)}
+.field input,.field select,.field textarea{font:400 16px Barlow,Arial,sans-serif;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:9px 10px;width:100%;min-height:44px}
+.field textarea{min-height:70px;resize:vertical}
+.field input[readonly]{background:var(--green-soft);color:var(--muted);border-style:dashed;cursor:default}
+.hint{font-size:12px;color:var(--muted)}
+.sum{font:700 18px "Barlow Condensed",Arial,sans-serif;color:var(--green)}
+.err{color:var(--danger);font-size:13px;grid-column:1/-1;min-height:1em}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg label{flex:1;text-align:center;padding:9px 4px;cursor:pointer;font-weight:600;font-size:14px;color:var(--ink);border-left:1px solid var(--line);min-height:44px;display:flex;align-items:center;justify-content:center}
+.seg label:first-child{border-left:0}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--green);color:var(--paper)}
+.seg label:has(input:focus-visible){outline:3px solid var(--brass);outline-offset:-3px}
+
+@media (max-width:640px){
+  .wrap{padding:18px 16px 96px}
+  h1{font-size:34px}
+  header .actions .add{display:none}
+  .scroll{display:none}
+  .cards{display:block}
+  .fab.on{display:inline-block}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stat{padding:12px}
+  .stat b{font-size:26px}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;width:100%}
+  .tab{white-space:nowrap}
+  .dlg-body{grid-template-columns:1fr}
+  dialog{width:100vw;max-width:100vw;margin:auto 0 0;border-radius:14px 14px 0 0;max-height:92dvh}
+  dialog form{max-height:92dvh}
+  .dlg-foot{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+}
+@media print{
+  .actions,.filters,.msg,.fab,.charts,dialog{display:none !important}
+  body{background:#fff;color:#000}
+  .scroll{display:block !important;border-color:#999;overflow:visible}
+  .cards{display:none !important}
+  .stats{border-color:#999}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Schießbuch Pistole</h1>
+      <div class="sub">David Gehlert, KK-Schützenverein 1909 Übernthal e.V.</div>
+    </div>
+    <div class="actions">
+      <button class="btn add" id="addBtn" type="button" hidden>+ Ergebnis eintragen</button>
+      <button class="btn ghost" id="pdfBtn" type="button">Als PDF speichern</button>
+      <button class="btn ghost" id="logoutBtn" type="button" hidden>Abmelden</button>
+    </div>
+  </header>
+
+  <div class="filters"><div class="tabs" id="tabs" role="group" aria-label="Disziplin wählen"></div><label class="year">Jahr <select id="year"></select></label></div>
+  <div class="stats" id="stats"></div>
+  <section class="charts" id="charts" aria-label="Leistungskurve"></section>
+  <div class="scroll"><table>
+    <thead><tr><th class="num">Lfd.&nbsp;Nr.</th><th>Datum</th><th>Disziplin</th><th>Art</th><th>Stand / Gegner</th><th>Kaliber</th><th class="num">Ergebnis</th><th>Notizen</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="8" class="empty">Ergebnisse werden geladen …</td></tr></tbody>
+  </table></div>
+  <div class="cards" id="cards"><div class="empty">Ergebnisse werden geladen …</div></div>
+  <div class="msg" id="msg" role="status"></div>
+</div>
+<button class="btn fab" id="fab" type="button">+ Ergebnis</button>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <form id="form" method="dialog" novalidate>
+    <div class="dlg-head"><h2 id="dlgTitle">Ergebnis eintragen</h2></div>
+    <div class="dlg-body">
+      <div class="field"><label for="f-datum">Datum</label><input id="f-datum" type="date" required></div>
+      <div class="field"><label for="f-disz">Disziplin</label><select id="f-disz"></select></div>
+      <div class="field full"><label id="artLbl">Art</label>
+        <div class="seg" role="radiogroup" aria-labelledby="artLbl">
+          <label><input type="radio" name="art" value="Training" checked>Training</label>
+          <label><input type="radio" name="art" value="RWK">RWK</label>
+          <label><input type="radio" name="art" value="Meisterschaft">Meisterschaft</label>
+        </div>
+      </div>
+      <div class="field"><label for="f-ort">Stand / Ort</label><input id="f-ort" type="text" list="ortList" autocomplete="off"></div>
+      <div class="field" id="gegnerField"><label for="f-gegner">Gegner</label><input id="f-gegner" type="text" list="gegnerList" autocomplete="off"></div>
+      <div class="field full"><label for="f-serien">Serien</label><input id="f-serien" type="text" inputmode="decimal" placeholder="z. B. 92 95 89 94" autocomplete="off"><span class="hint">Mit Leerzeichen getrennt. Die Summe wird automatisch berechnet: <span class="sum" id="sum">–</span></span></div>
+      <div class="field"><label for="f-gesamt">Gesamt (Ringe)</label><input id="f-gesamt" type="text" inputmode="decimal" autocomplete="off"><span class="hint">Leer lassen, wenn Serien eingetragen sind.</span></div>
+      <div class="field"><label for="f-schuss">Schusszahl</label><input id="f-schuss" type="number" inputmode="numeric" min="0" step="1"></div>
+      <div class="field"><label for="f-kaliber">Kaliber</label><input id="f-kaliber" type="text" readonly tabindex="-1" aria-readonly="true"><span class="hint">Ergibt sich aus der Disziplin.</span></div>
+      <div class="field full"><label for="f-notiz">Notizen</label><textarea id="f-notiz"></textarea></div>
+      <div class="err" id="err" role="alert"></div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn danger" type="button" id="delBtn" hidden>Löschen</button>
+      <div class="right">
+        <button class="btn ghost" type="button" id="cancelBtn">Abbrechen</button>
+        <button class="btn" type="submit" id="saveBtn">Speichern</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+<dialog id="loginDlg" aria-labelledby="loginTitle">
+  <form id="loginForm" novalidate>
+    <div class="dlg-head"><h2 id="loginTitle">Anmelden</h2></div>
+    <div class="dlg-body">
+      <div class="field full"><label for="l-mail">E-Mail</label><input id="l-mail" type="email" autocomplete="username" required></div>
+      <div class="field full"><label for="l-pw">Passwort</label><input id="l-pw" type="password" autocomplete="current-password" required></div>
+      <div class="err" id="loginErr" role="alert"></div>
+    </div>
+    <div class="dlg-foot"><div class="right"><button class="btn" type="submit" id="loginBtn">Anmelden</button></div></div>
+  </form>
+</dialog>
+<datalist id="ortList"></datalist><datalist id="gegnerList"></datalist>
+
+<script>
+const DISZ = {
+  "2.10":"Luftpistole",
+  "2.40":"KK Sportpistole",
+  "2.55":"Großkaliberrevolver .357 Magnum",
+  "2.60":"Standardpistole"
+};
+const KALIBER = {"2.10":"LuPi 4,5 mm","2.40":".22","2.55":".357","2.60":".22"};
+let entries = [];
+let filter = "alle";
+let year = "alle";
+let db = null, canWrite = false, editing = null;
+const isComp = e => e.art && e.art!=="Training";
+const artLabel = e => e.art||"Training";
+const artClass = e => e.art==="RWK"?"rwk":(isComp(e)?"wk":"");
+const ortOf = e => [e.ort,e.gegner?("gegen "+e.gegner):""].filter(Boolean).join(", ");
+
+const fmt = n => (n==null||n==="") ? "–" : (Math.round(n*10)/10).toLocaleString("de-DE",{maximumFractionDigits:1});
+const fmtDate = s => { if(!s) return ""; const [y,m,d]=String(s).split("-"); return d?`${d}.${m}.${y}`:s; };
+const totalOf = e => typeof e.gesamt==="number" ? e.gesamt : (Array.isArray(e.serien)&&e.serien.length? e.serien.reduce((a,b)=>a+(+b||0),0) : null);
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num = s => { const v=parseFloat(String(s).replace(",",".")); return isFinite(v)?v:null; };
+const parseSerien = s => String(s||"").trim().split(/[\s;\/+]+/).filter(Boolean).map(num);
+
+let lfd = {};
+function computeLfd(){
+  lfd={};
+  const sorted=entries.slice().sort((a,b)=>String(a.datum).localeCompare(String(b.datum))||String(a.id).localeCompare(String(b.id)));
+  const c={};
+  for(const e of sorted){ const y=String(e.datum).slice(0,4); c[y]=(c[y]||0)+1; lfd[e.id]=c[y]; }
+}
+const yearOf = e => String(e.datum).slice(0,4);
+function byYear(list){ const g={}; for(const e of list){ (g[yearOf(e)]=g[yearOf(e)]||[]).push(e); } return Object.keys(g).sort().reverse().map(y=>[y,g[y]]); }
+function visible(){
+  return entries.filter(e=>(filter==="alle"||e.disziplin===filter)&&(year==="alle"||String(e.datum).slice(0,4)===year))
+    .sort((a,b)=>String(b.datum).localeCompare(String(a.datum))||String(b.id).localeCompare(String(a.id)));
+}
+
+function renderTabs(){
+  const t=document.getElementById("tabs");
+  const keys=["alle",...Object.keys(DISZ)];
+  const inY=entries.filter(e=>year==="alle"||String(e.datum).slice(0,4)===year);
+  t.innerHTML=keys.map(k=>{
+    const n=k==="alle"?inY.length:inY.filter(e=>e.disziplin===k).length;
+    const label=k==="alle"?"Alle":`${k} ${DISZ[k]}`;
+    return `<button class="tab" type="button" data-k="${k}" aria-pressed="${k===filter}">${esc(label)} <small>(${n})</small></button>`;
+  }).join("");
+  t.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{filter=b.dataset.k;render();});
+}
+
+function statsFor(list){
+  const tot=list.map(totalOf).filter(v=>typeof v==="number");
+  const rwk=list.filter(isComp).map(totalOf).filter(v=>typeof v==="number");
+  const tr=list.filter(e=>!isComp(e)).map(totalOf).filter(v=>typeof v==="number");
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  const days=new Set(list.map(e=>e.datum)).size;
+  const cut=new Date(); cut.setFullYear(cut.getFullYear()-1); const cs=cut.toISOString().slice(0,10);
+  const last12=new Set(list.filter(e=>String(e.datum)>=cs).map(e=>e.datum)).size;
+  return {days,last12,n:list.length,avgAll:avg(tot),avgRwk:avg(rwk),avgTr:avg(tr),best:tot.length?Math.max(...tot):null};
+}
+
+function renderStats(list){
+  const s=statsFor(list);
+  const el=document.getElementById("stats");
+  if(filter==="alle"){
+    el.innerHTML=`<div class="stat"><b>${s.days}</b><span>Schießtermine${year==="alle"?" gesamt":" "+year}</span></div>`+
+      (year==="alle"?`<div class="stat best"><b>${s.last12}</b><span>Termine letzte 12 Monate</span></div>`:"")+
+      Object.keys(DISZ).map(k=>{
+        const ss=statsFor(list.filter(e=>e.disziplin===k));
+        return `<div class="stat"><b>${fmt(ss.avgRwk)}</b><span>Ø Wettkampf ${k}</span></div>`;
+      }).join("");
+  } else {
+    el.innerHTML=`
+      <div class="stat"><b>${s.days}</b><span>Schießtermine</span></div>
+      <div class="stat"><b>${fmt(s.avgTr)}</b><span>Ø Training</span></div>
+      <div class="stat"><b>${fmt(s.avgRwk)}</b><span>Ø Wettkampf</span></div>
+      <div class="stat best"><b>${fmt(s.best)}</b><span>Bestes Ergebnis</span></div>`;
+  }
+}
+
+/* ---------- Leistungskurve ---------- */
+const dayNum = s => { const [y,m,d]=String(s).split("-").map(Number); return Date.UTC(y,(m||1)-1,d||1)/864e5; };
+function chartSvg(points, wide){
+  const narrow=window.innerWidth<=640; wide=wide&&!narrow;
+  const W=wide?900:(narrow?340:440), H=wide?240:190, L=40, R=10, T=12, B=26;
+  const xs=points.map(p=>p.x), ys=points.map(p=>p.y);
+  let x0=Math.min(...xs), x1=Math.max(...xs); if(x1-x0<30){ x0-=15; x1+=15; }
+  let y0=Math.min(...ys), y1=Math.max(...ys); const pad=Math.max(4,(y1-y0)*.12); y0=Math.floor((y0-pad)/5)*5; y1=Math.ceil((y1+pad)/5)*5;
+  const sx=x=>L+(x-x0)/(x1-x0)*(W-L-R), sy=y=>T+(1-(y-y0)/(y1-y0))*(H-T-B);
+  const step=[5,10,20,25,50,100].find(s=>(y1-y0)/s<=5)||100;
+  let g="";
+  for(let v=Math.ceil(y0/step)*step; v<=y1; v+=step){ g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${sy(v)}" y2="${sy(v)}"/><text class="axis" x="${L-6}" y="${sy(v)+4}" text-anchor="end">${v}</text>`; }
+  const ya=new Date(x0*864e5).getUTCFullYear(), yb=new Date(x1*864e5).getUTCFullYear();
+  const every=Math.max(1,Math.ceil((yb-ya+1)/(wide?10:5)));
+  for(let y=ya; y<=yb+1; y+=every){ const xv=Date.UTC(y,0,1)/864e5; if(xv<x0||xv>x1) continue;
+    g+=`<line class="grid" x1="${sx(xv)}" x2="${sx(xv)}" y1="${T}" y2="${H-B}" stroke-dasharray="2 3"/><text class="axis" x="${sx(xv)}" y="${H-8}" text-anchor="middle">${y}</text>`; }
+  if(ya===yb||g.indexOf('text-anchor="middle"')<0){ g+=`<text class="axis" x="${L}" y="${H-8}">${fmtDate(points[0].d)}</text><text class="axis" x="${W-R}" y="${H-8}" text-anchor="end">${fmtDate(points[points.length-1].d)}</text>`; }
+  // gleitender Schnitt über die letzten 5 Ergebnisse
+  const tr=points.map((p,i)=>{ const w=points.slice(Math.max(0,i-4),i+1); return [sx(p.x),sy(w.reduce((a,b)=>a+b.y,0)/w.length)]; });
+  const path=tr.length>1?`<path class="trend" d="M${tr.map(p=>p.map(v=>v.toFixed(1)).join(" ")).join(" L")}"/>`:"";
+  const best=Math.max(...ys);
+  const dots=points.map(p=>`<circle class="${p.w?"dot-w":"dot-t"}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="${wide?4:3.5}"><title>${fmtDate(p.d)} · ${esc(p.art)} · ${fmt(p.y)}</title></circle>`+(p.y===best?`<circle class="dot-best" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="${wide?8:7}"/>`:"")).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ergebnisse über die Zeit">${g}${path}${dots}</svg>`;
+}
+function renderCharts(list){
+  const el=document.getElementById("charts");
+  const keys=filter==="alle"?Object.keys(DISZ):[filter];
+  const blocks=keys.map(k=>{
+    const pts=list.filter(e=>e.disziplin===k&&typeof totalOf(e)==="number")
+      .map(e=>({x:dayNum(e.datum),y:totalOf(e),d:e.datum,w:isComp(e),art:artLabel(e)}))
+      .sort((a,b)=>a.x-b.x);
+    if(filter==="alle"&&pts.length<2) return "";
+    const s=pts.length?statsFor(list.filter(e=>e.disziplin===k)):null;
+    const last5=pts.slice(-5), prev5=pts.slice(-10,-5);
+    const a5=last5.length?last5.reduce((a,b)=>a+b.y,0)/last5.length:null;
+    const p5=prev5.length?prev5.reduce((a,b)=>a+b.y,0)/prev5.length:null;
+    const diff=(a5!=null&&p5!=null)?a5-p5:null;
+    const meta=pts.length?`${pts.length} Ergebnisse · Ø letzte 5: ${fmt(a5)}`+(diff!=null?` (${diff>=0?"+":""}${fmt(diff)} zu den 5 davor)`:"")+` · Bestes: ${fmt(s.best)}`:"";
+    return `<div class="chart${keys.length===1?" wide":""}"><h3>${k} ${esc(DISZ[k])}</h3><div class="meta">${meta}</div>`+
+      (pts.length>=2?chartSvg(pts,keys.length===1):`<div class="none">Noch zu wenige Ergebnisse mit Ringzahl für eine Kurve.</div>`)+
+      `<div class="legend"><span><i class="t"></i>Training</span><span><i class="w"></i>Wettkampf</span><span><i class="l"></i>Schnitt der letzten 5</span></div></div>`;
+  }).filter(Boolean);
+  el.innerHTML=blocks.join("");
+  el.hidden=!blocks.length;
+}
+
+/* ---------- Liste ---------- */
+function renderRows(list){
+  const tb=document.getElementById("rows"), cards=document.getElementById("cards");
+  if(!list.length){
+    const t=canWrite?"Noch keine Ergebnisse. Tipp auf „Ergebnis eintragen“ oder sag es Claude im Chat.":"Noch keine Ergebnisse für diese Auswahl.";
+    tb.innerHTML=`<tr><td colspan="8" class="empty">${t}</td></tr>`;
+    cards.innerHTML=`<div class="empty">${t}</div>`;
+    return;
+  }
+  const clickAttr=e=>canWrite?` class="click" tabindex="0" data-id="${esc(e.id)}" title="Antippen zum Bearbeiten"`:"";
+  const row=e=>{
+    const serien=Array.isArray(e.serien)&&e.serien.length?`<span class="small">${e.serien.map(fmt).join(" · ")}</span>`:"";
+    return `<tr${clickAttr(e)}>
+      <td class="num lfd">${lfd[e.id]||""}</td>
+      <td>${esc(fmtDate(e.datum))}</td>
+      <td class="disz">${esc(e.disziplin)}<br><span class="note">${esc(DISZ[e.disziplin]||"")}</span></td>
+      <td><span class="art ${artClass(e)}">${esc(artLabel(e))}</span></td>
+      <td>${esc(ortOf(e))}</td>
+      <td>${esc(e.kaliber)}</td>
+      <td class="num total">${fmt(totalOf(e))}${serien}</td>
+      <td class="note">${esc(e.notiz)}</td></tr>`;
+  };
+  const groups=byYear(list);
+  tb.innerHTML=groups.map(([y,l])=>{
+    const days=new Set(l.map(e=>e.datum)).size;
+    return `<tr class="yr"><td colspan="8">${y}<span>${l.length} Einträge an ${days} Tagen</span></td></tr>`+l.map(row).join("");
+  }).join("");
+  const card=e=>{
+    const tag=canWrite?"button":"div";
+    const serien=Array.isArray(e.serien)&&e.serien.length?`<small>${e.serien.map(fmt).join(" · ")}</small>`:"";
+    const l2=[e.disziplin?`${e.disziplin} ${DISZ[e.disziplin]||""}`:"",ortOf(e)].filter(Boolean).join(" · ");
+    return `<${tag} class="card"${canWrite?` type="button" data-id="${esc(e.id)}"`:""}>
+      <div class="top"><span class="date">${esc(fmtDate(e.datum))}</span><span class="art ${artClass(e)}">${esc(artLabel(e))}</span></div>
+      <div class="res">${fmt(totalOf(e))}${serien}</div>
+      <div class="line2">${esc(l2)}</div>
+      ${e.notiz?`<div class="line3">${esc(e.notiz)}</div>`:""}
+    </${tag}>`;
+  };
+  cards.innerHTML=groups.map(([y,l])=>{
+    const days=new Set(l.map(e=>e.datum)).size;
+    return `<div class="yrhead">${y}<span>${l.length} Einträge an ${days} Tagen</span></div>`+l.map(card).join("");
+  }).join("");
+}
+function onListClick(ev){
+  const t=ev.target.closest("[data-id]"); if(!t||!canWrite) return;
+  const e=entries.find(x=>x.id===t.dataset.id); if(e) openForm(e);
+}
+document.getElementById("rows").addEventListener("click",onListClick);
+document.getElementById("rows").addEventListener("keydown",ev=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); onListClick(ev);} });
+document.getElementById("cards").addEventListener("click",onListClick);
+
+function renderYears(){
+  const sel=document.getElementById("year");
+  const ys=[...new Set(entries.map(e=>String(e.datum).slice(0,4)))].sort().reverse();
+  if(year!=="alle"&&!ys.includes(year)) year="alle";
+  sel.innerHTML=`<option value="alle">Alle</option>`+ys.map(y=>`<option value="${y}"${y===year?" selected":""}>${y}</option>`).join("");
+}
+document.getElementById("year").onchange=ev=>{year=ev.target.value;render();};
+let rz, narrowNow=window.innerWidth<=640;
+window.addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ const n=window.innerWidth<=640; if(n!==narrowNow){ narrowNow=n; renderCharts(visible()); } },150); });
+function render(){ computeLfd(); renderYears(); renderTabs(); const v=visible(); renderStats(v); renderCharts(v); renderRows(v); }
+
+/* ---------- Eingabe ---------- */
+const $=id=>document.getElementById(id);
+const dlg=$("dlg");
+$("f-disz").innerHTML=Object.keys(DISZ).map(k=>`<option value="${k}">${k} ${DISZ[k]}</option>`).join("");
+const artVal=()=>document.querySelector('input[name="art"]:checked').value;
+const setArt=v=>{ const r=document.querySelector(`input[name="art"][value="${v}"]`)||document.querySelector('input[name="art"][value="Training"]'); r.checked=true; };
+function updateArtUi(){ $("gegnerField").style.display=artVal()==="RWK"?"":"none"; }
+document.querySelectorAll('input[name="art"]').forEach(r=>r.onchange=updateArtUi);
+function updateSum(){
+  const s=parseSerien($("f-serien").value);
+  const ok=s.length&&s.every(v=>v!=null);
+  $("sum").textContent=ok?fmt(s.reduce((a,b)=>a+b,0)):"–";
+}
+$("f-serien").oninput=updateSum;
+$("f-disz").onchange=()=>{ $("f-kaliber").value=KALIBER[$("f-disz").value]||""; };
+function fillLists(){
+  const uniq=f=>[...new Set(entries.map(e=>e[f]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"de"));
+  $("ortList").innerHTML=uniq("ort").map(v=>`<option value="${esc(v)}">`).join("");
+  $("gegnerList").innerHTML=uniq("gegner").map(v=>`<option value="${esc(v)}">`).join("");
+}
+function today(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function openForm(e){
+  editing=e||null;
+  fillLists();
+  $("err").textContent="";
+  $("dlgTitle").textContent=e?"Ergebnis bearbeiten":"Ergebnis eintragen";
+  $("delBtn").hidden=!e;
+  // Vorgabe für neue Einträge: zuletzt benutzte Disziplin
+  const recent=entries.slice().sort((a,b)=>String(b.datum).localeCompare(String(a.datum)))[0];
+  const disz=e?e.disziplin:(filter!=="alle"?filter:(recent&&recent.disziplin)||"2.40");
+  $("f-datum").value=e?e.datum:today();
+  $("f-disz").value=DISZ[disz]?disz:"2.40";
+  setArt(e?artLabel(e):"Training");
+  $("f-ort").value=e?(e.ort||""):"Übernthal";
+  $("f-gegner").value=e?(e.gegner||""):"";
+  $("f-serien").value=e&&Array.isArray(e.serien)?e.serien.join(" "):"";
+  $("f-gesamt").value=e&&typeof e.gesamt==="number"?String(e.gesamt).replace(".",","):"";
+  $("f-schuss").value=e&&e.schuss!=null?e.schuss:"";
+  $("f-kaliber").value=KALIBER[$("f-disz").value]||"";
+  $("f-notiz").value=e?(e.notiz||""):"";
+  updateArtUi(); updateSum();
+  dlg.showModal();
+}
+$("addBtn").onclick=()=>openForm();
+$("fab").onclick=()=>openForm();
+$("cancelBtn").onclick=()=>dlg.close();
+function slug(s){ return String(s).replace(/[^0-9A-Za-z]/g,""); }
+$("form").onsubmit=async ev=>{
+  ev.preventDefault();
+  const err=$("err"); err.textContent="";
+  const datum=$("f-datum").value;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(datum)){ err.textContent="Bitte ein Datum wählen."; return; }
+  const serien=parseSerien($("f-serien").value);
+  if(serien.some(v=>v==null)){ err.textContent="Serien bitte nur als Zahlen eingeben, mit Leerzeichen getrennt."; return; }
+  const gesamtTxt=$("f-gesamt").value.trim(), gesamt=gesamtTxt?num(gesamtTxt):null;
+  if(gesamtTxt&&gesamt==null){ err.textContent="Gesamt muss eine Zahl sein."; return; }
+  const art=artVal();
+  const data={...(editing?Object.fromEntries(Object.entries(editing).filter(([k])=>k!=="id")):{}),
+    datum, disziplin:$("f-disz").value, art,
+    ort:$("f-ort").value.trim(), kaliber:KALIBER[$("f-disz").value]||"", notiz:$("f-notiz").value.trim(),
+    serien};
+  const g=gesamt!=null?gesamt:(serien.length?serien.reduce((a,b)=>a+b,0):null);
+  if(g!=null) data.gesamt=g; else delete data.gesamt;
+  const sch=$("f-schuss").value.trim();
+  if(sch!=="") data.schuss=Math.round(+sch); else delete data.schuss;
+  const geg=$("f-gegner").value.trim();
+  if(art==="RWK"&&geg) data.gegner=geg; else delete data.gegner;
+  const id=editing?editing.id:`${datum}_${slug(data.disziplin)}_${art==="Training"?"t":art==="RWK"?"rwk":"ms"}_${Date.now().toString(36)}`;
+  $("saveBtn").disabled=true;
+  try{
+    await db.collection("ergebnisse").doc(id).set(data);
+    dlg.close();
+    $("msg").textContent=editing?"Änderung gespeichert.":"Ergebnis gespeichert.";
+  }catch(e){
+    err.textContent="Speichern hat nicht geklappt. Bitte noch einmal versuchen.";
+  }finally{ $("saveBtn").disabled=false; }
+};
+$("delBtn").onclick=async()=>{
+  if(!editing) return;
+  if(!confirm(`Eintrag vom ${fmtDate(editing.datum)} wirklich löschen?`)) return;
+  try{ await db.collection("ergebnisse").doc(editing.id).delete(); dlg.close(); $("msg").textContent="Eintrag gelöscht."; }
+  catch(e){ $("err").textContent="Löschen hat nicht geklappt. Bitte noch einmal versuchen."; }
+};
+
+/* ---------- PDF ---------- */
+async function makePdf(){
+  const msg=document.getElementById("msg");
+  const list=visible();
+  if(!window.jspdf){ window.print(); return; }
+  const { jsPDF } = window.jspdf;
+  const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
+  const groups=byYear(list).reverse();
+  if(!groups.length){ msg.textContent="Keine Einträge für diese Auswahl."; return; }
+  groups.forEach(([y,l],gi)=>{
+    if(gi>0) doc.addPage();
+    const s=statsFor(l);
+    doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.setTextColor(31,69,53);
+    doc.text(`Schießnachweis ${y} – David Gehlert`+(filter==="alle"?"":` – ${filter} ${DISZ[filter]}`),14,16);
+    doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(80);
+    doc.text(`KK-Schützenverein 1909 Übernthal e.V.   Einträge: ${l.length}   Schießtage: ${s.days}   Stand: ${new Date().toLocaleDateString("de-DE")}`,14,23);
+    doc.autoTable({
+      startY:28,
+      head:[["Lfd. Nr.","Datum","Disziplin","Art","Stand / Gegner","Kaliber","Ergebnis","Notizen"]],
+      body:l.slice().reverse().map(e=>[lfd[e.id]||"",fmtDate(e.datum),`${e.disziplin} ${DISZ[e.disziplin]||""}`,artLabel(e),
+        ortOf(e),e.kaliber||"",totalOf(e)==null?"":fmt(totalOf(e)),e.notiz||""]),
+      styles:{font:"helvetica",fontSize:9,cellPadding:2},
+      headStyles:{fillColor:[31,69,53]},
+      columnStyles:{0:{halign:"right",cellWidth:16},6:{halign:"right",fontStyle:"bold"},7:{cellWidth:60}},
+      alternateRowStyles:{fillColor:[240,244,241]}
+    });
+  });
+  const blob=doc.output("blob");
+  const name="Schiessbuch"+(filter==="alle"?"":"_"+filter)+(year==="alle"?"":"_"+year)+".pdf";
+  try{
+    const dl=window.claude?await claude.use("downloads"):null;
+    if(!dl){ doc.save(name); return; }
+    await dl.save({filename:name,data:blob});
+    msg.textContent="PDF gespeichert.";
+  }catch(err){
+    msg.textContent = err&&err.code==="declined" ? "Speichern abgebrochen." : "PDF konnte nicht gespeichert werden – versuch es noch einmal.";
+  }
+}
+document.getElementById("pdfBtn").onclick=makePdf;
+
+render();
+(async()=>{
+  db = window.claude ? await claude.use("db") : null;
+  if(!db&&window.SupaDB){
+    db=window.SupaDB;
+    if(!(await db.session())){
+      $("loginDlg").addEventListener("cancel",ev=>ev.preventDefault());
+      $("loginDlg").showModal();
+      await new Promise(done=>{
+        $("loginForm").onsubmit=async ev=>{
+          ev.preventDefault(); $("loginErr").textContent=""; $("loginBtn").disabled=true;
+          try{ await db.login($("l-mail").value.trim(),$("l-pw").value); $("loginDlg").close(); done(); }
+          catch(e){ $("loginErr").textContent=navigator.onLine?"E-Mail oder Passwort stimmt nicht.":"Keine Internetverbindung."; }
+          finally{ $("loginBtn").disabled=false; }
+        };
+      });
+    }
+    db.collection("ergebnisse").onSnapshot(snap=>{ entries=snap.docs.map(d=>({id:d.id,...d.data()})); render(); },
+      ()=>{ $("msg").textContent=navigator.onLine?"Daten konnten nicht geladen werden.":"Offline: Du siehst den zuletzt geladenen Stand."; });
+    canWrite=true; $("addBtn").hidden=false; $("fab").classList.add("on"); $("logoutBtn").hidden=false; render();
+    $("logoutBtn").onclick=async()=>{ if(confirm("Wirklich abmelden?")){ await db.logout(); location.reload(); } };
+    return;
+  }
+  if(!db){
+    const t="Die Ergebnisse können in dieser Ansicht nicht geladen werden.";
+    document.getElementById("rows").innerHTML=`<tr><td colspan="8" class="empty">${t}</td></tr>`;
+    document.getElementById("cards").innerHTML=`<div class="empty">${t}</div>`;
+    return;
+  }
+  db.collection("ergebnisse").onSnapshot(snap=>{
+    entries=snap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  },()=>{ document.getElementById("msg").textContent="Verbindung zu den Daten unterbrochen – Seite neu laden."; });
+  const user=await claude.use("user");
+  canWrite=(await user?.isOwner())??false;
+  if(canWrite){ $("addBtn").hidden=false; $("fab").classList.add("on"); render(); }
+})();
+if("serviceWorker" in navigator&&location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
